@@ -37,7 +37,7 @@ func (p *parser) sourceContext(token Token) model.AldaSourceContext {
 		return model.AldaSourceContext{}
 	}
 
-	return token.sourceContext
+	return token.SourceContext
 }
 
 func newParser(filename string, tokens []Token, opts ...parseOption) *parser {
@@ -67,7 +67,7 @@ func (p *parser) previous() Token {
 
 func (p *parser) check(types ...TokenType) bool {
 	for _, tokenType := range types {
-		if p.peek().tokenType == tokenType {
+		if p.peek().TokenType == tokenType {
 			return true
 		}
 	}
@@ -76,7 +76,7 @@ func (p *parser) check(types ...TokenType) bool {
 }
 
 func (p *parser) advance() Token {
-	if p.peek().tokenType != EOF {
+	if p.peek().TokenType != EOF {
 		p.current++
 	}
 
@@ -100,7 +100,7 @@ func (p *parser) addUpdate(update model.ScoreUpdate) {
 
 func (p *parser) errorAtToken(token Token, msg string) *model.AldaSourceError {
 	return &model.AldaSourceError{
-		Context: token.sourceContext,
+		Context: token.SourceContext,
 		Err:     fmt.Errorf("%s", msg),
 	}
 }
@@ -113,7 +113,7 @@ func (p *parser) unexpectedTokenError(
 	}
 
 	msg := fmt.Sprintf(
-		"Unexpected %s `%s`%s", token.tokenType.String(), token.text, context,
+		"Unexpected %s `%s`%s", token.TokenType.String(), token.Text, context,
 	)
 
 	return p.errorAtToken(token, msg)
@@ -131,21 +131,21 @@ func (p *parser) lispForm(context string) (model.LispForm, error) {
 	if token, matched := p.match(Symbol); matched {
 		return model.LispSymbol{
 			SourceContext: p.sourceContext(token),
-			Name:          token.text,
+			Name:          token.Text,
 		}, nil
 	}
 
 	if token, matched := p.match(Number); matched {
 		return model.LispNumber{
 			SourceContext: p.sourceContext(token),
-			Value:         token.literal.(float64),
+			Value:         token.Literal.(float64),
 		}, nil
 	}
 
 	if token, matched := p.match(String); matched {
 		return model.LispString{
 			SourceContext: p.sourceContext(token),
-			Value:         token.literal.(string),
+			Value:         token.Literal.(string),
 		}, nil
 	}
 
@@ -160,7 +160,7 @@ func (p *parser) lispList() (model.LispList, error) {
 	// NB: This assumes the initial LeftParen token was already consumed.
 	list := model.LispList{SourceContext: p.sourceContext(p.previous())}
 
-	for token := p.peek(); token.tokenType != RightParen; token = p.peek() {
+	for token := p.peek(); token.TokenType != RightParen; token = p.peek() {
 		if _, matched := p.match(EOF); matched {
 			return list, p.errorAtToken(token, "Unterminated S-expression.")
 		}
@@ -205,7 +205,7 @@ func (p *parser) part() ([]model.ScoreUpdate, error) {
 
 	partDecl := model.PartDeclaration{
 		SourceContext: p.sourceContext(nameToken),
-		Names:         []string{nameToken.text},
+		Names:         []string{nameToken.Text},
 	}
 
 	for {
@@ -218,11 +218,11 @@ func (p *parser) part() ([]model.ScoreUpdate, error) {
 			return nil, err
 		}
 
-		partDecl.Names = append(partDecl.Names, name.text)
+		partDecl.Names = append(partDecl.Names, name.Text)
 	}
 
 	if _, matched := p.match(Alias); matched {
-		partDecl.Alias = p.previous().literal.(string)
+		partDecl.Alias = p.previous().Literal.(string)
 	}
 
 	if _, err := p.consume(Colon, "in part declaration"); err != nil {
@@ -238,25 +238,25 @@ func (p *parser) variableDefinition() ([]model.ScoreUpdate, error) {
 
 	definition := model.VariableDefinition{
 		SourceContext: p.sourceContext(nameToken),
-		VariableName:  nameToken.text,
+		VariableName:  nameToken.Text,
 	}
-	definitionLine := nameToken.sourceContext.Line
+	definitionLine := nameToken.SourceContext.Line
 
 	if _, err := p.consume(Equals, "in variable definition"); err != nil {
 		return nil, err
 	}
 
-	if p.peek().tokenType == EOF || p.peek().sourceContext.Line > definitionLine {
+	if p.peek().TokenType == EOF || p.peek().SourceContext.Line > definitionLine {
 		return nil, &model.AldaSourceError{
-			Context: nameToken.sourceContext,
+			Context: nameToken.SourceContext,
 			Err: fmt.Errorf(
 				"there must be at least one event on the same line as the '='",
 			),
 		}
 	}
 
-	for t := p.peek(); t.sourceContext.Line == definitionLine; t = p.peek() {
-		if t.tokenType == EOF {
+	for t := p.peek(); t.SourceContext.Line == definitionLine; t = p.peek() {
+		if t.TokenType == EOF {
 			break
 		}
 
@@ -275,7 +275,7 @@ func (p *parser) singleOrRepeated(update model.ScoreUpdate) model.ScoreUpdate {
 		return model.Repeat{
 			SourceContext: p.sourceContext(token),
 			Event:         update,
-			Times:         token.literal.(int32),
+			Times:         token.Literal.(int32),
 		}
 	}
 
@@ -288,7 +288,7 @@ func (p *parser) variableReference() ([]model.ScoreUpdate, error) {
 
 	reference := model.VariableReference{
 		SourceContext: p.sourceContext(nameToken),
-		VariableName:  nameToken.text,
+		VariableName:  nameToken.Text,
 	}
 
 	return []model.ScoreUpdate{p.singleOrRepeated(reference)}, nil
@@ -296,7 +296,7 @@ func (p *parser) variableReference() ([]model.ScoreUpdate, error) {
 
 func (p *parser) partOrVariableOp() ([]model.ScoreUpdate, error) {
 	// NB: This assumes the initial Name token was already consumed.
-	switch p.peek().tokenType {
+	switch p.peek().TokenType {
 	case Equals:
 		return p.variableDefinition()
 	case Alias, Separator, Colon:
@@ -313,7 +313,7 @@ func (p *parser) octaveSet() ([]model.ScoreUpdate, error) {
 	return []model.ScoreUpdate{
 		model.AttributeUpdate{
 			SourceContext: p.sourceContext(token),
-			PartUpdate:    model.OctaveSet{OctaveNumber: token.literal.(int32)},
+			PartUpdate:    model.OctaveSet{OctaveNumber: token.Literal.(int32)},
 		},
 	}, nil
 }
@@ -326,15 +326,15 @@ func (p *parser) durationComponent() model.DurationComponent {
 	// NB: This assumes the duration component token was already consumed.
 	token := p.previous()
 
-	switch token.tokenType {
+	switch token.TokenType {
 	case NoteLength:
-		nl := token.literal.(noteLength)
+		nl := token.Literal.(noteLength)
 		return model.NoteLength{
 			Denominator: nl.denominator,
 			Dots:        nl.dots,
 		}
 	case NoteLengthMs:
-		return model.NoteLengthMs{Quantity: token.literal.(float64)}
+		return model.NoteLengthMs{Quantity: token.Literal.(float64)}
 	}
 
 	// We shouldn't get here.
@@ -410,7 +410,7 @@ func (p *parser) note() (model.Note, error) {
 	// NB: This assumes the initial NoteLetter token was already consumed.
 	token := p.previous()
 
-	noteLetter, err := model.NewNoteLetter(token.literal.(rune))
+	noteLetter, err := model.NewNoteLetter(token.Literal.(rune))
 	if err != nil {
 		return model.Note{}, err
 	}
@@ -461,7 +461,7 @@ func (p *parser) rest() model.Rest {
 
 func (p *parser) noteOrRest() (model.ScoreUpdate, error) {
 	// NB: This assumes the initial NoteLetter/RestLetter was already consumed.
-	switch letter := p.previous(); letter.tokenType {
+	switch letter := p.previous(); letter.TokenType {
 	case NoteLetter:
 		return p.note()
 	case RestLetter:
@@ -527,7 +527,7 @@ func (p *parser) noteRestOrChord() ([]model.ScoreUpdate, error) {
 			allUpdates = append(allUpdates, noteOrRest)
 			repeat = model.Repeat{
 				SourceContext: p.sourceContext(token),
-				Times:         token.literal.(int32),
+				Times:         token.Literal.(int32),
 			}
 			break
 		}
@@ -595,7 +595,7 @@ func (p *parser) repetitions() ([]model.RepetitionRange, error) {
 
 	repetitions := []model.RepetitionRange{}
 
-	for _, er := range token.literal.([]repetitionRange) {
+	for _, er := range token.Literal.([]repetitionRange) {
 		repetitionRange := model.RepetitionRange{First: er.first, Last: er.last}
 		repetitions = append(repetitions, repetitionRange)
 	}
@@ -609,7 +609,7 @@ func (p *parser) eventSeq() ([]model.ScoreUpdate, error) {
 
 	allEvents := []model.ScoreUpdate{}
 
-	for token := p.peek(); token.tokenType != EventSeqClose; token = p.peek() {
+	for token := p.peek(); token.TokenType != EventSeqClose; token = p.peek() {
 		if _, matched := p.match(EOF); matched {
 			return nil, p.errorAtToken(token, "Unterminated event sequence.")
 		}
@@ -654,7 +654,7 @@ func (p *parser) cram() ([]model.ScoreUpdate, error) {
 
 	allEvents := []model.ScoreUpdate{}
 
-	for token := p.peek(); token.tokenType != CramClose; token = p.peek() {
+	for token := p.peek(); token.TokenType != CramClose; token = p.peek() {
 		if _, matched := p.match(EOF); matched {
 			return nil, p.errorAtToken(token, "Unterminated cram expression.")
 		}
@@ -686,7 +686,7 @@ func (p *parser) voiceMarker() ([]model.ScoreUpdate, error) {
 	// NB: This assumes the VoiceMarker token was already consumed.
 	token := p.previous()
 
-	voiceNumber := token.literal.(int32)
+	voiceNumber := token.Literal.(int32)
 
 	if voiceNumber == 0 {
 		return []model.ScoreUpdate{
@@ -759,7 +759,7 @@ func (p *parser) topLevel() ([]model.ScoreUpdate, error) {
 		return []model.ScoreUpdate{
 			model.Marker{
 				SourceContext: p.sourceContext(token),
-				Name:          token.literal.(string),
+				Name:          token.Literal.(string),
 			},
 		}, nil
 	}
@@ -768,7 +768,7 @@ func (p *parser) topLevel() ([]model.ScoreUpdate, error) {
 		return []model.ScoreUpdate{
 			model.AtMarker{
 				SourceContext: p.sourceContext(token),
-				Name:          token.literal.(string),
+				Name:          token.Literal.(string),
 			},
 		}, nil
 	}
@@ -798,7 +798,7 @@ func Parse(
 
 	p := newParser(filepath, tokens, opts...)
 
-	for t := p.peek(); t.tokenType != EOF; t = p.peek() {
+	for t := p.peek(); t.TokenType != EOF; t = p.peek() {
 		// log.Debug().Str("token", t.String()).Msg("Parsing token.")
 
 		updates, err := p.topLevel()

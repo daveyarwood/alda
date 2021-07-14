@@ -97,10 +97,10 @@ const (
 
 // A Token is a result of lexical analysis done by the scanner.
 type Token struct {
-	sourceContext model.AldaSourceContext
-	tokenType     TokenType
-	text          string
-	literal       interface{}
+	SourceContext model.AldaSourceContext
+	TokenType     TokenType
+	Text          string
+	Literal       interface{}
 }
 
 func (tt TokenType) String() string {
@@ -181,11 +181,11 @@ func (tt TokenType) String() string {
 func (t Token) String() string {
 	return fmt.Sprintf(
 		"[%d:%d] %s | %#q | %#v",
-		t.sourceContext.Line,
-		t.sourceContext.Column,
-		t.tokenType.String(),
-		t.text,
-		t.literal,
+		t.SourceContext.Line,
+		t.SourceContext.Column,
+		t.TokenType.String(),
+		t.Text,
+		t.Literal,
 	)
 }
 
@@ -271,10 +271,10 @@ func (s *scanner) addToken(tokenType TokenType, literal interface{}) {
 	text := string(s.input[s.start:s.current])
 
 	token := Token{
-		tokenType: tokenType,
-		text:      text,
-		literal:   literal,
-		sourceContext: model.AldaSourceContext{
+		TokenType: tokenType,
+		Text:      text,
+		Literal:   literal,
+		SourceContext: model.AldaSourceContext{
 			Filename: s.filename,
 			Line:     s.startLine,
 			Column:   s.startColumn,
@@ -664,7 +664,7 @@ func (s *scanner) scanToken() error {
 		// skip whitespace
 		return nil
 	case '#':
-		s.skipComment()
+		s.skipComment() // TODO: scan comments, only drop at the parsing level
 		return nil
 	case '(':
 		s.sexpLevel++
@@ -793,10 +793,10 @@ func Scan(filename string, input string) ([]Token, error) {
 	}
 
 	s.tokens = append(s.tokens, Token{
-		tokenType: EOF,
-		text:      "",
-		literal:   nil,
-		sourceContext: model.AldaSourceContext{
+		TokenType: EOF,
+		Text:      "",
+		Literal:   nil,
+		SourceContext: model.AldaSourceContext{
 			Filename: s.filename,
 			Line:     s.line,
 			Column:   s.column,

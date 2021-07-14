@@ -18,16 +18,17 @@ type ScoreUpdate interface {
 	// something went wrong.
 	UpdateScore(score *Score) error
 
-	// DurationMs returns a number of milliseconds representing how long an event
-	// takes. For events where duration is not relevant (e.g. an octave change
-	// event), this can return 0.
+	// DurationMs returns a number of milliseconds representing how long an
+	// event takes. For events where duration is not relevant (e.g. an octave
+	// change event), this can return 0.
 	//
-	// The context for this is the Cram event, which involves summing the duration
-	// of a number of events and then time-scaling them into a fixed duration.
+	// The context for this is the Cram event, which involves summing the
+	// duration of a number of events and then time-scaling them into a fixed
+	// duration.
 	DurationMs(part *Part) float64
 
-	// VariableValue returns the value that is captured when an event is part of a
-	// variable definition.
+	// VariableValue returns the value that is captured when an event is part of
+	// a variable definition.
 	//
 	// Returns an error if the value cannot be captured.
 	VariableValue(score *Score) (ScoreUpdate, error)
